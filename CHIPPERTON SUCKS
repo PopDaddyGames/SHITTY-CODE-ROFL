@@ -1,0 +1,340 @@
+private void CheckInteract() {
+    if (playerMovement.digging || playerMovement.pouring || playerMovement.interacting) {
+        return;
+    }
+    if (npcController && npcController.alive && (!npcController.missionGoalFinished || !npcController.missionComplete) && !playerInventory.toolIsActive) {
+        // talk
+        if (!npcController.missionComplete && !npcController.missionGoalFinished && !npcController.spawnedTool) {
+            interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+            interactText.text = "Talk\n[e]";
+            interactTextActive = true;
+        } else if (!npcController.missionComplete && npcController.missionGoalFinished && !npcController.spawnedTool) {
+            interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+            interactText.text = "Talk\n[e]";
+            interactTextActive = true;
+        } else if (!npcController.missionComplete && !npcController.missionGoalFinished && npcController.spawnedTool) {
+            interactTextActive = true;
+            interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+            interactText.text = "Back already?";
+            npcController.startedDialog = true;
+            npcController.missionStarted = true;
+            UpdateMissionCards();
+            UpdateMissionGoals(npcController.activeCharacter);
+        } else if (!npcController.missionComplete && npcController.missionGoalFinished && npcController.spawnedTool) {
+            interactTextActive = true;
+            interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+            interactText.text = "Did you do it?\n[e]";
+        }
+        if (playerInput.interact) {
+            if (npcController.missionGoalFinished) {
+                if (npcController.missionCompleteTracker < npcController.dialogMissionComplete[npcController.activeCharacter].line.Length) {
+                    // check if missions done
+                    MissionDialog(npcController.dialogMissionComplete[npcController.activeCharacter].line[npcController.missionCompleteTracker]);
+                    MissionTracker(npcController.activeCharacter, npcController.dialogMissionComplete[npcController.activeCharacter].line[npcController.missionCompleteTracker]);
+                    npcController.missionCompleteTracker++;
+                    if (npcController.missionCompleteTracker == npcController.dialogMissionComplete[npcController.activeCharacter].line.Length) {
+                        npcController.missionComplete = true;
+                        //if (npcController.activeCharacter == 3) {
+                            if (!npcController.spawnedNote) {
+                                storyController.ActivateNoteObject(activeCharacter);
+                                npcController.spawnedNote = true;
+                            }
+                            
+                        //}
+                        npcController.MissionMarker(false);
+                        missionsCompleted++;
+                        //npcController.MissionMarker(false);
+                        audioSource.PlayOneShot(npcController.missionCompleteAudioClip[npcController.activeCharacter]);
+                        UpdateMissionCards();
+                    }
+                }
+            } else if (npcController.missionTracker < npcController.dialog[npcController.activeCharacter].line.Length) {
+                // spawn tool after first dialog
+                MissionDialog(npcController.dialog[npcController.activeCharacter].line[npcController.missionTracker]);
+                MissionTracker(npcController.activeCharacter, npcController.dialog[npcController.activeCharacter].line[npcController.missionTracker]);
+                npcController.missionTracker++;
+                if (!npcController.spawnedTool && npcController.missionTracker == npcController.dialog[npcController.activeCharacter].line.Length) {
+                    toolPickups[npcController.activeCharacter].gameObject.SetActive(true);
+                    //npcController.MissionMarker(true);
+                    npcController.spawnedTool = true;
+                    //print("assdffg");
+                }
+            }
+        }
+    } else if (npcController && npcController.alive && (playerInventory.activeTool == 0 || playerInventory.activeTool == 1) && playerInventory.toolIsActive) {
+        // Kill
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+        interactText.text = LDJam47_PlayerThirst.thirst > 0 ? "Kill\n[e]" : "Use\n[e]";
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        if (playerInput.interact && (playerInventory.activeTool == 0 || playerInventory.activeTool == 1)) {
+            NPCTextActive = false;
+            interactTextActive = false;
+            npcController.Kill(playerInventory.activeTool);
+            if (!npcController.spawnedNote) {
+                storyController.ActivateNoteObject(activeCharacter);
+                npcController.spawnedNote = true;
+            }
+            playerMovement.ZoomIn(false);
+            playerMovement.CameraZoomPop();
+            if (playerInventory.activeTool == 0) {
+                playerMovement.animatorController.SetTrigger("smash");
+            } else if (playerInventory.activeTool == 1) {
+                playerMovement.animatorController.SetTrigger("stab");
+            }
+            audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+            UpdateMissionCardNPCNames();
+            audioSource.PlayOneShot(npcDeathVoiceAudioClip[npcController.activeCharacter], voiceVolume);
+            //MissionTracker(npcController.activeCharacter, "DECEASED");
+            UpdateMissionCards();
+            charactersKilled[npcController.activeCharacter] = true;
+            npcController = null;
+            playerInventory.ChangeActiveTool(playerInventory.activeTool);
+            backgroundMusic.RestartMusic();
+            LDJam47_PlayerThirst.thirst = 1;
+        }
+    } else if (npcController && !npcController.alive && playerInventory.activeTool == 6 && playerInventory.toolIsActive && LDJam47_PlayerThirst.thirst > 0) {
+        // Dig Grave
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+        interactText.text = npcController.fire ? "Smother\n[e]" : "Use Shovel\n[e]";
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        if (playerInput.interact) {
+            interactTextActive = false;
+            playerInventory.ChangeActiveTool(playerInventory.activeTool);
+            audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+            //npcController.gameObject.SetActive(false);
+            //Destroy(npcController.gameObject);
+            npcController.gameObject.SetActive(false);
+            GameObject _grave = Instantiate(gravePrefab, npcController.transform.position, npcController.transform.rotation);
+            playerMovement.StartDigging();
+            playerMovement.ZoomIn(false);
+        }
+    } else if (graveDirtObject && playerInventory.activeTool == 2 && playerInventory.toolIsActive) {
+        // PLACE FLOWERS ON GRAVE
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, graveDirtObject.transform.position, 6f * Time.deltaTime);
+        interactText.text = "Plant Flowers\n[e]";
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        if (playerInput.interact) {
+            interactTextActive = false;
+            playerInventory.ChangeActiveTool(playerInventory.activeTool);
+            audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+            GameObject _flowers = Instantiate(graveFlowersPrefab, graveDirtObject.transform.position, graveDirtObject.transform.rotation);
+            //playerMovement.StartInteracting();
+            playerMovement.StartPouringWater();
+            Destroy(graveDirtObject);
+        }
+    } else if (npcController && !npcController.gasolined && playerInventory.activeTool == 7 && playerInventory.toolIsActive && LDJam47_PlayerThirst.thirst > 0 && playerInventory.gasCanFilled) {
+        // spray with gas NPC
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+        interactText.text = "Pour Gasoline\n[e]";
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        playerInventory.toolObject[playerInventory.activeTool].SetActive(true);
+        if (playerInput.interact) {
+            interactTextActive = false;
+            gasParticleSystem.transform.gameObject.SetActive(true);
+            audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+            playerMovement.StartPouring();
+            npcController.gasolined = true;
+        }
+    } else if (npcController && npcController.gasolined && !npcController.fire && playerInventory.activeTool == 5 && playerInventory.toolIsActive && LDJam47_PlayerThirst.thirst > 0) {
+        // light on fire NPC
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcController.transform.position, 6f * Time.deltaTime);
+        interactText.text = "Flame " + npcController.name[npcController.activeCharacter] + "\n" + playerInput.interactDisplayName;
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        if (playerInput.interact) { // lighting live npc on fire
+            interactTextActive = false;
+            npcController.fire = true;
+            playerInventory.ChangeActiveTool(playerInventory.activeTool);
+            npcController.gameObject.SetActive(false);
+            GameObject _fire = Instantiate(npcFirePrefab, npcController.transform.position, npcController.transform.rotation);
+            GameObject _burnedBody = Instantiate(burnedBodyPrefab, npcController.transform.position, npcController.transform.rotation);
+            Destroy(_fire, 6f);
+            //Destroy(npcController.gameObject);
+            if (npcController.alive) {
+                npcController.Kill(playerInventory.activeTool);
+                if (!npcController.spawnedNote) {
+                    storyController.ActivateNoteObject(activeCharacter);
+                    npcController.spawnedNote = true;
+                }
+                playerMovement.ZoomIn(false);
+                playerMovement.CameraZoomPop();
+                UpdateMissionCardNPCNames();
+                //audioSource.PlayOneShot(killVoiceAudioClip, 1f);
+                audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+                audioSource.PlayOneShot(npcDeathVoiceAudioClip[npcController.activeCharacter], voiceVolume);
+                //MissionTracker(npcController.activeCharacter, "DECEASED");
+                UpdateMissionCards();
+                LDJam47_PlayerThirst.thirst = 1;
+                if (npcController.activeCharacter == 2) {
+                    audioSource.PlayOneShot(femaleScreamAudioClip, 1f);
+                } else {
+                    audioSource.PlayOneShot(maleScreamAudioClip, 1f);
+                }
+                //npcController.gameObject.SetActive(false);
+                //npcController = null;
+                npcController = null;
+            }
+        }
+    } else if (flowerContainer && playerInventory.activeTool == 7 && playerInventory.toolIsActive && !flowerContainer.gasolined && playerInventory.gasCanFilled && LDJam47_PlayerThirst.thirst > 0) {
+        // spray with gas FLOWERS
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, flowerContainer.transform.position, 6f * Time.deltaTime);
+        interactText.text = "Pour Gasoline on Flowers\n[e]";
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        playerInventory.toolObject[playerInventory.activeTool].SetActive(true);
+        if (playerInput.interact) {
+            interactTextActive = false;
+            audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+            gasParticleSystem.transform.gameObject.SetActive(true);
+            playerMovement.StartPouring();
+            flowerContainer.gasolined = true;
+        }
+    } else if (flowerContainer && flowerContainer.gasolined && !flowerContainer.flamed && playerInventory.activeTool == 5 && playerInventory.toolIsActive && LDJam47_PlayerThirst.thirst > 0) {
+        // light on fire FLOWERS
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, flowerContainer.transform.position, 6f * Time.deltaTime);
+        interactText.text = "Light Flowers on Fire\n[e]";
+        interactTextActive = true;
+        if (LDJam47_PlayerThirst.thirst > 0) {
+            playerMovement.ZoomIn(true);
+        }
+        if (playerInput.interact) {
+            playerInventory.ChangeActiveTool(playerInventory.activeTool);
+            interactTextActive = false;
+            audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+            GameObject _fire = Instantiate(npcFirePrefab, flowerContainer.transform.position, flowerContainer.transform.rotation);
+            GameObject _grave = Instantiate(gravePrefab, flowerContainer.transform.position, flowerContainer.transform.rotation);
+            flowerContainer.flamed = true;
+            Destroy(_fire, 6f);
+            Destroy(flowerContainer.gameObject);
+        }
+    } else if (npcMissionGoal && !npcMissionGoal.completed && playerInventory.tools[npcMissionGoal.character] && playerInventory.toolIsActive && npcMissionGoal.character == playerInventory.activeTool) {
+        // MISSION GOALS
+        interactCanvas.position = Vector3.Lerp(interactCanvas.position, npcMissionGoal.transform.position, 6f * Time.deltaTime);
+        interactText.text = "Use\n[e]";
+        interactTextActive = true;
+        if (playerInput.interact) {
+            // DO MISSIONS
+            if (playerInventory.tools[npcMissionGoal.character]) {
+                if (npcMissionGoal.character == 6) {
+                    playerMovement.StartDigging();
+                    //playerInventory.ChangeActiveTool(6);
+                    audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool], 1f);
+                    npcMissionGoal.transform.gameObject.SetActive(false);
+                    GameObject _grave = Instantiate(gravePrefab, npcMissionGoal.transform.position, npcMissionGoal.transform.rotation);
+                } else {
+                    //playerMovement.StartInteracting();
+                    if (npcMissionGoal.character == 1) {
+                        audioSource.PlayOneShot(tomatoChopSFXAudioClip, 1f);
+                        audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool], 1f);
+                        playerMovement.StartInteracting();
+                        // WAS OFF? //playerInventory.ChangeActiveTool(1);
+                    }
+                    if (npcMissionGoal.character == 3) {
+                        //audioSource.PlayOneShot(panSFXAudioClip, .4f);
+                        audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool], 1f);
+                        playerMovement.StartInteracting();
+                        playerMovement.animatorController.SetTrigger("smash");
+                    }
+                    if (npcMissionGoal.character == 4) {
+                        //playerMovement.StartInteracting();
+                        playerMovement.StartShooting();
+                    }
+                    if (npcMissionGoal.character == 5) {
+                        playerMovement.StartInteracting();
+                    }
+                    if (npcMissionGoal.character == 7) {
+                        playerMovement.StartInteracting();
+                    }
+                }
+                if (npcMissionGoal.character == 2) {
+                    GameObject _flowers = Instantiate(graveFlowersPrefab, npcMissionGoal.transform.position, npcMissionGoal.transform.rotation);
+                    playerMovement.StartPouringWater();
+                    //Destroy(npcMissionGoal.gameObject);
+                }
+                if (npcMissionGoal.character == 4) {
+                    audioSource.PlayOneShot(rifleShotAudioClip, 1f);
+                    audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool], 1f);
+                    wolfAudioSource.gameObject.SetActive(false);
+                }
+                if (npcMissionGoal.character == 7) {
+                    playerInventory.gasCanFilled = true;
+                }
+                playerInventory.DisableAllTools();
+                if (npcMissionGoal.character == 6) {
+                    playerInventory.ChangeActiveTool(playerInventory.activeTool);
+                }
+                npcMissionGoal.completed = true;
+                npcMissionGoal.highlight.SetActive(false);
+                characterTasksComplete[npcMissionGoal.character]++;
+                
+                if (npcMissionGoal.character == 4 || npcMissionGoal.character == 6) {
+                    playerInventory.ChangeActiveTool(npcMissionGoal.character);
+                }
+                playerMovement.ZoomIn(false);
+                npcMissionGoal = null;
+            }
+            // CHECK IF MISSIONS DONE
+            for (int i = 0; i < characterTasksComplete.Length; i++) {
+                if (characterTasksComplete[i] == characterTasksGoal[i]) {
+                    allNPCControllers[i].missionGoalFinished = true;
+                    if (allNPCControllers[i].missionComplete) {
+                        allNPCControllers[i].MissionMarker(false);
+                    } else if (allNPCControllers[i].missionGoalFinished) {
+                        allNPCControllers[i].MissionMarker(true);
+                    }
+                    MissionTracker(i, "Head back to " + allNPCControllers[i].title[allNPCControllers[i].activeCharacter] + " " + allNPCControllers[i].name[allNPCControllers[i].activeCharacter]);
+                }
+            }
+        }
+    } else if (explodableObject && LDJam47_PlayerThirst.thirst > 0) {
+        // EXPLODABLE OBJECTS!
+        if (playerInventory.activeTool == 5 && explodableObject.gasolined && playerInventory.toolIsActive && !explodableObject.flamed) {
+            // burn
+            interactCanvas.position = Vector3.Lerp(interactCanvas.position, explodableObject.transform.position, 6f * Time.deltaTime);
+            interactText.text = "Flame\n[e]";
+            interactTextActive = true;
+            if (playerInput.interact) {
+                playerInventory.ChangeActiveTool(playerInventory.activeTool);
+                interactTextActive = false;
+                audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+                GameObject _fire = Instantiate(npcFirePrefab, explodableObject.transform.position, explodableObject.transform.parent.rotation);
+                GameObject _explosion = Instantiate(explosionPrefab, explodableObject.transform.position, explodableObject.transform.parent.rotation);
+                //Invoke(playerMovement.AddExplosionToCamera(), 6f);
+                //_explosion.SetActive(false);
+                Destroy(_fire, 5f);
+                Destroy(explodableObject.transform.parent.gameObject, 3.5f);
+            }
+        } else if (playerInventory.activeTool == 7 && !explodableObject.gasolined && playerInventory.toolIsActive && playerInventory.gasCanFilled) {
+            // spray with gas
+            interactCanvas.position = Vector3.Lerp(interactCanvas.position, explodableObject.transform.position, 6f * Time.deltaTime);
+            interactText.text = "Pour Gasoline\n[e]";
+            interactTextActive = true;
+            playerInventory.toolObject[playerInventory.activeTool].SetActive(true);
+            if (playerInput.interact) {
+                interactTextActive = false;
+                audioSource.PlayOneShot(playerInventory.toolAudioClip[playerInventory.activeTool]);
+                gasParticleSystem.transform.gameObject.SetActive(true);
+                explodableObject.gasolined = true;
+                playerMovement.StartPouring();
+            }
+        }
+    } else {
+        interactTextActive = false;
+    }
+}
